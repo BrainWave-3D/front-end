@@ -27,6 +27,7 @@ import java.util.*
 @Composable
 fun ProfileScreen(
     onNavigateBack: () -> Unit,
+    onLogout: () -> Unit,
     currentUserData: PatientDetails? = null
 ) {
     var isEditMode by remember { mutableStateOf(false) }

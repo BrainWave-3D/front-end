@@ -2,12 +2,17 @@ package com.example.brainwave3d.ui.presentation.auth_screen.signup_screen
 
 // SignUpScreen.kt
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,39 +23,47 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(
     onNavigateToLogin: () -> Unit,
-    onSignUpSuccess: () -> Unit
+    onSignUpSuccess: () -> Unit,
+    viewModel: SignUpViewModel = hiltViewModel()
 ) {
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("ADHD Detection App") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
+    var showErrorDialog by remember { mutableStateOf(false) }
+
+    // Handle successful signup
+    LaunchedEffect(state.signupResponse) {
+        if (state.signupResponse != null) {
+            onSignUpSuccess()
+            viewModel.resetState()
         }
-    ) { paddingValues ->
+    }
+
+    // Show error dialog if there's an error
+    LaunchedEffect(state.error) {
+        if (state.error.isNotEmpty()) {
+            showErrorDialog = true
+        }
+    }
+
+    Scaffold { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp)
+                .padding(vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(32.dp))
+
             Text(
                 text = "Create Account",
                 style = MaterialTheme.typography.headlineLarge,
@@ -68,12 +81,12 @@ fun SignUpScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Name Field
+            // Full Name Field
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
+                value = state.fullName,
+                onValueChange = { viewModel.onEvent(SignUpUiEvent.FullNameChange(it)) },
                 label = { Text("Full Name") },
-                placeholder = { Text("Enter your name") },
+                placeholder = { Text("Enter your full name") },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Person,
@@ -81,15 +94,16 @@ fun SignUpScreen(
                     )
                 },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isLoading
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Email Field
             OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
+                value = state.email,
+                onValueChange = { viewModel.onEvent(SignUpUiEvent.EmailChange(it)) },
                 label = { Text("Email") },
                 placeholder = { Text("Enter your email") },
                 leadingIcon = {
@@ -100,15 +114,16 @@ fun SignUpScreen(
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isLoading
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Password Field
             OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
+                value = state.password,
+                onValueChange = { viewModel.onEvent(SignUpUiEvent.PasswordChange(it)) },
                 label = { Text("Password") },
                 placeholder = { Text("Enter your password") },
                 leadingIcon = {
@@ -118,34 +133,43 @@ fun SignUpScreen(
                     )
                 },
                 trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    IconButton(
+                        onClick = { viewModel.onEvent(SignUpUiEvent.TogglePasswordVisibility) }
+                    ) {
                         Icon(
-                            imageVector = if (passwordVisible)
-                                Icons.Default.AccountCircle
+                            imageVector = if (state.isPasswordVisible)
+                                Icons.Default.Visibility
                             else
-                                Icons.Default.AccountCircle,
-                            contentDescription = if (passwordVisible)
+                                Icons.Default.VisibilityOff,
+                            contentDescription = if (state.isPasswordVisible)
                                 "Hide password"
                             else
                                 "Show password"
                         )
                     }
                 },
-                visualTransformation = if (passwordVisible)
+                visualTransformation = if (state.isPasswordVisible)
                     VisualTransformation.None
                 else
                     PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isLoading,
+                supportingText = {
+                    Text(
+                        text = "Minimum 8 characters",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Confirm Password Field
             OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
+                value = state.confirmPassword,
+                onValueChange = { viewModel.onEvent(SignUpUiEvent.ConfirmPasswordChange(it)) },
                 label = { Text("Confirm Password") },
                 placeholder = { Text("Re-enter your password") },
                 leadingIcon = {
@@ -155,43 +179,64 @@ fun SignUpScreen(
                     )
                 },
                 trailingIcon = {
-                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                    IconButton(
+                        onClick = { viewModel.onEvent(SignUpUiEvent.ToggleConfirmPasswordVisibility) }
+                    ) {
                         Icon(
-                            imageVector = if (confirmPasswordVisible)
-                                Icons.Default.AccountCircle
+                            imageVector = if (state.isConfirmPasswordVisible)
+                                Icons.Default.Visibility
                             else
-                                Icons.Default.AccountCircle,
-                            contentDescription = if (confirmPasswordVisible)
+                                Icons.Default.VisibilityOff,
+                            contentDescription = if (state.isConfirmPasswordVisible)
                                 "Hide password"
                             else
                                 "Show password"
                         )
                     }
                 },
-                visualTransformation = if (confirmPasswordVisible)
+                visualTransformation = if (state.isConfirmPasswordVisible)
                     VisualTransformation.None
                 else
                     PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isLoading,
+                isError = !state.passwordsMatch && state.confirmPassword.isNotEmpty(),
+                supportingText = {
+                    if (!state.passwordsMatch && state.confirmPassword.isNotEmpty()) {
+                        Text(
+                            text = "Passwords do not match",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
             // Sign Up Button
             Button(
-                onClick = onSignUpSuccess,
+                onClick = { viewModel.onEvent(SignUpUiEvent.SignUp) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
+                enabled = !state.isLoading && state.passwordsMatch
             ) {
-                Text(
-                    text = "Sign Up",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "Sign Up",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -212,6 +257,44 @@ fun SignUpScreen(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    // Error Dialog
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showErrorDialog = false
+                viewModel.onEvent(SignUpUiEvent.ClearError)
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Sign Up Failed",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(state.error)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showErrorDialog = false
+                        viewModel.onEvent(SignUpUiEvent.ClearError)
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        )
     }
 }

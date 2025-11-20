@@ -77,7 +77,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "ADHD Detection",
+                            "BrainWave3D",
                             fontWeight = FontWeight.Bold
                         )
                     }
